@@ -132,6 +132,25 @@
                             </div>
                         </div>
 
+                        <!-- Nama Penginput -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Pencatat</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="person" value="Qabil" class="peer sr-only" checked>
+                                    <div class="text-center py-3 md:py-2 px-4 rounded-xl border-2 border-slate-200 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 hover:bg-slate-50 transition-all font-medium text-sm">
+                                        <i class="fas fa-user-astronaut mr-1"></i> Qabil
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="person" value="Aulia" class="peer sr-only">
+                                    <div class="text-center py-3 md:py-2 px-4 rounded-xl border-2 border-slate-200 peer-checked:border-purple-500 peer-checked:bg-purple-50 peer-checked:text-purple-700 hover:bg-slate-50 transition-all font-medium text-sm">
+                                        <i class="fas fa-user-ninja mr-1"></i> Aulia
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
                         <!-- Nominal -->
                         <div>
                             <label for="amount" class="block text-sm font-medium text-slate-700 mb-1">Nominal (Rp)</label>
@@ -370,12 +389,24 @@
                     const debitValue = isIncome ? `<span class="text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded-md">${formatRupiah(transaction.amount)}</span>` : '-';
                     const kreditValue = !isIncome ? `<span class="text-rose-600 font-medium bg-rose-50 px-2 py-1 rounded-md">${formatRupiah(transaction.amount)}</span>` : '-';
                     
+                    // Lencana (Badge) untuk Nama Penginput
+                    const personBadge = transaction.person === 'Aulia' 
+                        ? `<span class="inline-flex w-max items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"><i class="fas fa-user text-[10px] mr-1.5"></i> Aulia</span>`
+                        : transaction.person === 'Qabil'
+                        ? `<span class="inline-flex w-max items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"><i class="fas fa-user text-[10px] mr-1.5"></i> Qabil</span>`
+                        : '';
+
                     const row = document.createElement('tr');
                     row.classList.add('hover:bg-slate-50', 'transition-colors');
                     row.innerHTML = `
                         <!-- Mengganti padding kolom ke px-4 py-3 agar nyaman di layar HP namun tetap luas di Laptop -->
                         <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-slate-500">${formatDate(transaction.date)}</td>
-                        <td class="px-4 py-3 sm:px-6 sm:py-4 text-slate-800 font-medium">${transaction.text}</td>
+                        <td class="px-4 py-3 sm:px-6 sm:py-4 text-slate-800 font-medium">
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                ${personBadge}
+                                <span>${transaction.text}</span>
+                            </div>
+                        </td>
                         <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">${debitValue}</td>
                         <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">${kreditValue}</td>
                         <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-center">
@@ -402,6 +433,7 @@
             if(!currentUser) return; // Guard clause
 
             const type = document.querySelector('input[name="type"]:checked').value;
+            const person = document.querySelector('input[name="person"]:checked').value;
             const amount = parseFloat(document.getElementById('amount').value);
             const text = document.getElementById('text').value.trim();
             const date = document.getElementById('date').value;
@@ -419,6 +451,7 @@
                     text: text,
                     amount: amount,
                     type: type,
+                    person: person,
                     date: date,
                     createdAt: Date.now(),
                     createdBy: currentUser.uid
