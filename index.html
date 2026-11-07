@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catatan Keuangan Bersama</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .table-container::-webkit-scrollbar { height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Loading overlay */
+        #loadingOverlay {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar / Header -->
+    <nav class="bg-blue-600 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-lg">
+                    <i class="fas fa-users text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold tracking-wide">Buku Kas Bersama</h1>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Hapus class 'hidden' pada syncStatus agar terlihat di HP -->
+                <div id="syncStatus" class="flex items-center gap-2 bg-green-500/20 text-green-100 text-xs px-3 py-1.5 rounded-full border border-green-400/30">
+                    <span class="relative flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                    </span>
+                    Live Sync
+                </div>
+                <div class="text-sm font-medium opacity-90 hidden sm:block" id="currentDate"></div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full relative">
+        
+        <!-- Loading State -->
+        <div id="loadingOverlay" class="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-30 flex flex-col items-center justify-center rounded-2xl">
+            <i class="fas fa-circle-notch fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p class="text-slate-600 font-medium animate-pulse">Menghubungkan ke Database...</p>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Saldo Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -z-0"></div>
+                <div class="bg-blue-100 text-blue-600 p-4 rounded-xl z-10">
+                    <i class="fas fa-wallet text-2xl"></i>
+                </div>
+                <div class="z-10">
+                    <p class="text-sm font-medium text-slate-500 mb-1">Total Saldo Aktif</p>
+                    <h2 class="text-2xl font-bold text-slate-800" id="balance">Rp 0</h2>
+                </div>
+            </div>
+
+            <!-- Pemasukan Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full -z-0"></div>
+                <div class="bg-emerald-100 text-emerald-600 p-4 rounded-xl z-10">
+                    <i class="fas fa-arrow-trend-up text-2xl"></i>
+                </div>
+                <div class="z-10">
+                    <p class="text-sm font-medium text-slate-500 mb-1">Total Pemasukan</p>
+                    <h2 class="text-2xl font-bold text-slate-800" id="income">Rp 0</h2>
+                </div>
+            </div>
+
+            <!-- Pengeluaran Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex items-center gap-4 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -z-0"></div>
+                <div class="bg-rose-100 text-rose-600 p-4 rounded-xl z-10">
+                    <i class="fas fa-arrow-trend-down text-2xl"></i>
+                </div>
+                <div class="z-10">
+                    <p class="text-sm font-medium text-slate-500 mb-1">Total Pengeluaran</p>
+                    <h2 class="text-2xl font-bold text-slate-800" id="expense">Rp 0</h2>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layout Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Form Tambah Transaksi -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sticky top-24">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">Input Transaksi Baru</h3>
+                    
+                    <form id="transactionForm" class="space-y-4">
+                        <!-- Jenis Transaksi -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Jenis Transaksi</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="type" value="income" class="peer sr-only" checked>
+                                    <!-- Menambah padding py-3 agar tombol lebih besar di HP -->
+                                    <div class="text-center py-3 md:py-2 px-4 rounded-xl border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 hover:bg-slate-50 transition-all font-medium text-sm">
+                                        <i class="fas fa-plus-circle mr-1"></i> Masuk
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="type" value="expense" class="peer sr-only">
+                                    <!-- Menambah padding py-3 agar tombol lebih besar di HP -->
+                                    <div class="text-center py-3 md:py-2 px-4 rounded-xl border-2 border-slate-200 peer-checked:border-rose-500 peer-checked:bg-rose-50 peer-checked:text-rose-700 hover:bg-slate-50 transition-all font-medium text-sm">
+                                        <i class="fas fa-minus-circle mr-1"></i> Keluar
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Nominal -->
+                        <div>
+                            <label for="amount" class="block text-sm font-medium text-slate-700 mb-1">Nominal (Rp)</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-slate-500 sm:text-sm">Rp</span>
+                                </div>
+                                <!-- Menambah padding py-3 agar area input lebih luas (Touch Friendly) -->
+                                <input type="number" id="amount" required min="1" placeholder="Contoh: 150000" 
+                                    class="w-full pl-10 pr-3 py-3 md:py-2 text-base border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-slate-50 focus:bg-white">
+                            </div>
+                        </div>
+
+                        <!-- Keterangan -->
+                        <div>
+                            <label for="text" class="block text-sm font-medium text-slate-700 mb-1">Keterangan</label>
+                            <input type="text" id="text" required placeholder="Contoh: Belanja Bulanan, Gaji..." 
+                                class="w-full px-4 py-3 md:py-2 text-base border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-slate-50 focus:bg-white">
+                        </div>
+
+                        <!-- Tanggal -->
+                        <div>
+                            <label for="date" class="block text-sm font-medium text-slate-700 mb-1">Tanggal</label>
+                            <input type="date" id="date" required
+                                class="w-full px-4 py-3 md:py-2 text-base border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-slate-50 focus:bg-white">
+                        </div>
+
+                        <!-- Memperbesar tombol simpan (py-3.5) untuk jempol pengguna HP -->
+                        <button type="submit" id="btnSubmit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3.5 md:py-2.5 rounded-xl transition-colors mt-4 shadow-sm flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                            <span>Simpan ke Database</span>
+                            <i class="fas fa-cloud-arrow-up hidden" id="submitSpinner"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabel Riwayat Transaksi -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 class="text-lg font-semibold text-slate-800">Riwayat Transaksi (Live)</h3>
+                        <!-- Tombol hapus semua sengaja disembunyikan agar lebih aman untuk data kolaboratif -->
+                    </div>
+                    
+                    <div class="table-container overflow-x-auto p-0">
+                        <table class="w-full text-left border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                                    <!-- Menyesuaikan padding tabel agar lebih ringkas di HP -->
+                                    <th class="px-4 py-3 sm:px-6 sm:py-4 font-semibold">Tanggal</th>
+                                    <th class="px-4 py-3 sm:px-6 sm:py-4 font-semibold">Keterangan</th>
+                                    <th class="px-4 py-3 sm:px-6 sm:py-4 font-semibold text-right">Debit (Masuk)</th>
+                                    <th class="px-4 py-3 sm:px-6 sm:py-4 font-semibold text-right">Kredit (Keluar)</th>
+                                    <th class="px-4 py-3 sm:px-6 sm:py-4 font-semibold text-center w-20">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionList" class="divide-y divide-slate-100 text-sm">
+                                <!-- Rendered by JS -->
+                            </tbody>
+                        </table>
+                        
+                        <!-- Empty State -->
+                        <div id="emptyState" class="hidden flex-col items-center justify-center py-16 text-slate-400">
+                            <div class="bg-slate-50 p-4 rounded-full mb-4">
+                                <i class="fas fa-folder-open text-4xl text-slate-300"></i>
+                            </div>
+                            <p class="font-medium text-slate-500">Belum ada data transaksi.</p>
+                            <p class="text-xs mt-1">Data yang ditambahkan akan muncul di sini secara real-time.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Konfirmasi Hapus -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 transform scale-95 transition-transform" id="modalContent">
+            <div class="text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-rose-100 mb-4">
+                    <i class="fas fa-trash-can text-rose-600 text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Hapus Transaksi</h3>
+                <p class="text-sm text-slate-500 mb-6">Apakah Anda yakin? Data ini akan terhapus dari semua perangkat dan tidak dapat dikembalikan.</p>
+                <div class="flex gap-3 justify-center">
+                    <button id="btnCancel" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-medium transition-colors w-full">Batal</button>
+                    <button id="btnConfirm" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors w-full flex justify-center items-center gap-2">
+                        <span>Hapus</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logika dan Firebase (ES Module) -->
+    <script type="module">
+        // 1. Import Firebase Modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 2. Setup Konfigurasi & Variabel Global
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-kas-bersama';
+        
+        // Menggunakan Firebase Config dari proyek "Keuangan Kita"
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdKCWaU3gdx6E_9XB0g1b0KP494VWOuI0",
+            authDomain: "keuangan-kita-f3817.firebaseapp.com",
+            projectId: "keuangan-kita-f3817",
+            storageBucket: "keuangan-kita-f3817.firebasestorage.app",
+            messagingSenderId: "288295898285",
+            appId: "1:288295898285:web:ccad7741be87fdbe3e4a24"
+        };
+        
+        // Elemen DOM
+        const form = document.getElementById('transactionForm');
+        const balanceEl = document.getElementById('balance');
+        const incomeEl = document.getElementById('income');
+        const expenseEl = document.getElementById('expense');
+        const transactionList = document.getElementById('transactionList');
+        const emptyState = document.getElementById('emptyState');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const btnSubmit = document.getElementById('btnSubmit');
+        const submitSpinner = document.getElementById('submitSpinner');
+        
+        // Modal DOM
+        const modal = document.getElementById('confirmModal');
+        const btnCancel = document.getElementById('btnCancel');
+        const btnConfirm = document.getElementById('btnConfirm');
+        let itemToDeleteId = null;
+
+        // Inisialisasi Tanggal Header & Input Form
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('date').value = today;
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Format Rupiah
+        const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+        
+        // Format Tanggal
+        const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        // State Lokal
+        let transactions = [];
+        let currentUser = null;
+
+        // 3. Inisialisasi Firebase App
+        let app, db, auth;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error("Gagal menginisialisasi Firebase:", e);
+        }
+
+        // 4. Proses Autentikasi dan Sinkronisasi Data
+        async function initializeAppAuth() {
+            try {
+                // Autentikasi (Wajib sebelum query Firestore)
+                if (typeof __initial_auth_token !== 'undefined') {
+                    const userCredential = await signInWithCustomToken(auth, __initial_auth_token);
+                    currentUser = userCredential.user;
+                } else {
+                    const userCredential = await signInAnonymously(auth);
+                    currentUser = userCredential.user;
+                }
+
+                // Definisi Path Publik untuk Kolaborasi Bersama
+                // Path wajib: /artifacts/{appId}/public/data/{collectionName}
+                const transactionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+
+                // Listener Real-time Firestore
+                onSnapshot(transactionsRef, (snapshot) => {
+                    transactions = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    // Hilangkan Loading Screen saat data pertama masuk
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(() => loadingOverlay.classList.add('hidden'), 300);
+                    
+                    updateUI();
+                }, (error) => {
+                    console.error("Kesalahan membaca data dari server:", error);
+                    alert("Koneksi terputus. Gagal menyinkronkan data.");
+                });
+
+            } catch (error) {
+                console.error("Auth / Init Error:", error);
+                loadingOverlay.innerHTML = `<i class="fas fa-triangle-exclamation text-4xl text-rose-500 mb-4"></i><p class="text-slate-600 font-medium">Gagal memuat database.</p>`;
+            }
+        }
+
+        // 5. Fungsi Update Antarmuka (UI)
+        function updateUI() {
+            transactionList.innerHTML = '';
+            
+            // Kalkulasi
+            let income = 0;
+            let expense = 0;
+            
+            transactions.forEach(item => {
+                if(item.type === 'income') income += item.amount;
+                if(item.type === 'expense') expense += item.amount;
+            });
+            
+            const total = income - expense;
+
+            // Render Header Angka
+            balanceEl.innerText = formatRupiah(total);
+            incomeEl.innerText = formatRupiah(income);
+            expenseEl.innerText = formatRupiah(expense);
+            
+            balanceEl.className = total < 0 ? "text-2xl font-bold text-rose-600" : "text-2xl font-bold text-slate-800";
+
+            // Render Tabel
+            if(transactions.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden');
+                emptyState.classList.remove('flex');
+                
+                // Urutkan berdasarkan tanggal (terbaru di atas), kemudian waktu pembuatan jika tanggal sama
+                const sortedTransactions = [...transactions].sort((a, b) => {
+                    const dateDiff = new Date(b.date) - new Date(a.date);
+                    if (dateDiff === 0) return b.createdAt - a.createdAt;
+                    return dateDiff;
+                });
+
+                sortedTransactions.forEach(transaction => {
+                    const isIncome = transaction.type === 'income';
+                    const debitValue = isIncome ? `<span class="text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded-md">${formatRupiah(transaction.amount)}</span>` : '-';
+                    const kreditValue = !isIncome ? `<span class="text-rose-600 font-medium bg-rose-50 px-2 py-1 rounded-md">${formatRupiah(transaction.amount)}</span>` : '-';
+                    
+                    const row = document.createElement('tr');
+                    row.classList.add('hover:bg-slate-50', 'transition-colors');
+                    row.innerHTML = `
+                        <!-- Mengganti padding kolom ke px-4 py-3 agar nyaman di layar HP namun tetap luas di Laptop -->
+                        <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-slate-500">${formatDate(transaction.date)}</td>
+                        <td class="px-4 py-3 sm:px-6 sm:py-4 text-slate-800 font-medium">${transaction.text}</td>
+                        <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">${debitValue}</td>
+                        <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-right">${kreditValue}</td>
+                        <td class="px-4 py-3 sm:px-6 sm:py-4 whitespace-nowrap text-center">
+                            <button class="delete-btn text-slate-400 hover:text-rose-600 hover:bg-rose-50 w-9 h-9 sm:w-8 sm:h-8 rounded-lg transition-colors focus:outline-none flex items-center justify-center mx-auto" data-id="${transaction.id}">
+                                <i class="fas fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    transactionList.appendChild(row);
+                });
+
+                // Attach event listener ke tombol hapus dinamis
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        requestDelete(e.currentTarget.getAttribute('data-id'));
+                    });
+                });
+            }
+        }
+
+        // 6. Simpan Data Baru (Ke Firestore)
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if(!currentUser) return; // Guard clause
+
+            const type = document.querySelector('input[name="type"]:checked').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const text = document.getElementById('text').value.trim();
+            const date = document.getElementById('date').value;
+
+            if (text === '' || isNaN(amount) || amount <= 0) return;
+
+            // UI Loading state on button
+            btnSubmit.disabled = true;
+            submitSpinner.classList.remove('hidden');
+            submitSpinner.classList.add('fa-spin');
+
+            try {
+                const transactionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+                await addDoc(transactionsRef, {
+                    text: text,
+                    amount: amount,
+                    type: type,
+                    date: date,
+                    createdAt: Date.now(),
+                    createdBy: currentUser.uid
+                });
+
+                // Reset form
+                document.getElementById('text').value = '';
+                document.getElementById('amount').value = '';
+                document.getElementById('text').focus();
+            } catch (error) {
+                console.error("Error adding document: ", error);
+            } finally {
+                // Kembalikan tombol ke semula
+                btnSubmit.disabled = false;
+                submitSpinner.classList.add('hidden');
+                submitSpinner.classList.remove('fa-spin');
+            }
+        });
+
+        // 7. Hapus Data (Dari Firestore)
+        function requestDelete(id) {
+            itemToDeleteId = id;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => {
+                document.getElementById('modalContent').classList.remove('scale-95');
+                document.getElementById('modalContent').classList.add('scale-100');
+            }, 10);
+        }
+
+        function hideModal() {
+            document.getElementById('modalContent').classList.remove('scale-100');
+            document.getElementById('modalContent').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                itemToDeleteId = null;
+            }, 150);
+        }
+
+        btnCancel.addEventListener('click', hideModal);
+        
+        btnConfirm.addEventListener('click', async () => {
+            if (!itemToDeleteId || !currentUser) return;
+            
+            const originalText = btnConfirm.innerHTML;
+            btnConfirm.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btnConfirm.disabled = true;
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'transactions', itemToDeleteId);
+                await deleteDoc(docRef);
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+            } finally {
+                btnConfirm.innerHTML = originalText;
+                btnConfirm.disabled = false;
+                hideModal();
+            }
+        });
+
+        // Jalankan Inisialisasi Auth & Firebase
+        initializeAppAuth();
+
+    </script>
+</body>
+</html>
